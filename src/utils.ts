@@ -1,26 +1,6 @@
-export const fromString = (hexString: string): Uint8Array => {
-    let temp = Uint8Array.from((hexString.match(/.{1,2}/g) as RegExpMatchArray).map((byte) => parseInt(byte, 16)))
-
-    for(let i of [...Array(temp.length).keys()]) {
-        temp[i] = (Math.floor(temp[i] / 16) * 10) + temp[i] % 16
-    }
-
-    return temp
-}
-
-export const fromString2 = (str: string) => {
-    let temp = new Uint8Array(str.length)
-
-    for(let i of [...Array(temp.length).keys()]) {
-        temp[i] = parseInt(str[i])
-    }
-
-    return temp
-}
-
 export const charset = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[Ъ]…ЁЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧ█    '
 
-const sbox = [
+export const sbox = [
     0x06, 0x0E, 0x28, 0x42, 0x56, 0x08, 0x52, 0x55, 0x4D, 0x44,
     0x43, 0x02, 0x1A, 0x17, 0x35, 0x33, 0x61, 0x46, 0x30, 0x39,
     0x3A, 0x25, 0x18, 0x0B, 0x00, 0x4A, 0x10, 0x51, 0x5F, 0x34,
@@ -34,6 +14,20 @@ const sbox = [
 ];
 
 let eround = 0;
+
+export const fromString = (hexString: string): Uint8Array => {
+    let temp = Uint8Array.from((hexString.match(/.{1,2}/g) as RegExpMatchArray).map((byte) => parseInt(byte, 16)))
+
+    for(let i of [...Array(temp.length).keys()]) {
+        temp[i] = (Math.floor(temp[i] / 16) * 10) + temp[i] % 16
+    }
+
+    return temp
+}
+
+export const fromString2 = (str: string): Uint8Array => {
+    return new Uint8Array([...str].map(char => parseInt(char)));
+}
 
 export const getRandomInt = (min: number, max: number): number => {
     min = Math.ceil(min);
@@ -51,55 +45,50 @@ export const elementary_round = (data: Uint8Array, key: Uint8Array, offset: numb
 }
 
 export const full_round = (data: Uint8Array, key: Uint8Array): Uint8Array => {
-    for (let i of [...Array(50).keys()]) {
+    for (let i = 0; i < 50; i++) {
         data = elementary_round(data, key, i)
     }
 
     return data
 }
 
-export const sum_digsb = (bu: Uint8Array): number => {
-    let retv = 0
-    for (let i of [...Array(bu.length).keys()]) {
-        retv += bu[i]
-    }
-
-    return retv
+export const arraySum = (bu: Uint8Array): number => {
+    return bu.reduce((acc, number) => acc + number, 0)
 }
 
-export const arcop = (into: Uint8Array, from_list: Uint8Array, ipos: number): Uint8Array => {
-    for (let i of [...Array(from_list.length).keys()]) {
-        into[i + ipos] = from_list[i]
+export const arrayCopy = (target: Uint8Array, source: Uint8Array, offset: number): Uint8Array => {
+    for (let i = 0; i < source.length; i++) {
+        target[i + offset] = source[i]
     }
 
-    return into
+    return target
 }
 
 export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint8Array => {
     let buffer = new Uint8Array(10).fill(0)
-    buffer = arcop(buffer, mrk, 0)
-    buffer = arcop(buffer, mrk, 5)
+    buffer = arrayCopy(buffer, mrk, 0)
+    buffer = arrayCopy(buffer, mrk, 5)
 
-    eround = sum_digsb(buffer) % 100
+    eround = arraySum(buffer) % 100
 
     let temp = new Uint8Array(60).fill(0)
 
-    for (let i of [...Array(6).keys()]) {
+    for (let i = 0; i < 6; i++) {
         buffer = full_round(buffer, key)
-        temp = arcop(temp, buffer, i * 10)
+        temp = arrayCopy(temp, buffer, i * 10)
     }
 
     let new_key = new Uint8Array(50).fill(0)
 
-    for (let i of [...Array(50).keys()]) {
+    for (let i = 0; i < 50; i++) {
         new_key[i] = (key[i] + temp[i]) % 100
     }
 
     let temp2 = new Uint8Array((blocks_n * 10)).fill(0)
 
-    for (let i of [...Array(blocks_n).keys()]) {
+    for (let i = 0; i < blocks_n; i++) {
         buffer = full_round(buffer, new_key)
-        temp2 = arcop(temp2, buffer, i * 10)
+        temp2 = arrayCopy(temp2, buffer, i * 10)
     }
 
     return temp2
@@ -112,7 +101,7 @@ export const checksum = (key: Uint8Array): Uint8Array => {
     let cs_raw = stream(mrk, key, 1)
     let cs = new Uint8Array(10).fill(0)
 
-    for (let i of [...Array(5).keys()]) {
+    for (let i = 0; i < 5; i++) {
         cs[i * 2] = (10 + Math.floor(cs_raw[i] / 10) - cs_mask[i * 2]) % 10
         cs[i * 2 + 1] = (10 + cs_raw[i] % 10 - cs_mask[i * 2 + 1]) % 10
     }
@@ -145,20 +134,6 @@ export const prepare_ctext = (str: string, tweak: number[] = [0,0]) => {
 
 
 export function mrkToStr(mrk: Uint8Array): string {
-    if (mrk.length !== 5) {
-        throw new Error(`Wrong raw mrk length! Got ${mrk.length}, must be 5.`);
-    }
-
-    let outString = '';
-
-    for (let i = 0; i < 5; i++) {
-        outString += String(mrk[i]).padStart(2, '0');
-    }
-
-    return outString;
-}
-
-export const wrapText = (text: string, groupN: number): string => {
-    const regex = new RegExp(`.{1,${groupN}}`, 'g');
-    return text.match(regex)?.join(' ') || '';
+    if (mrk.length != 5) throw new Error(`Wrong key length. Expected 5, got ${mrk.length}`);
+    return Array.from(mrk).map(num => num.toString().padStart(2, '0')).join('');
 }

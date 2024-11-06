@@ -1,4 +1,4 @@
-import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream, wrapText } from "./utils";
+import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream } from "./utils";
 
 /**
  * @hideconstructor
@@ -29,11 +29,10 @@ export class Key {
 
         let s = ""
 
-        for(let i of [...Array(50).keys()]) {
+        for(let i = 0; i < 50; i++) {
             s += key[i].toString().padStart(2, "0")
         }
-
-        for(let i of Array.from({length:59-50+1},(v,k)=>k+50)) {
+        for(let i = 50; i < 60; i++) {
             s += key[i].toString()
         }
     
@@ -51,7 +50,7 @@ export class Key {
 
         let key = fromString(temp.slice(0, 100))
         let cs_in = fromString2(temp.slice(100, 110))
-        if(cs_in.toString() != checksum(key).toString()) console.log("CRC error");
+        if(cs_in.toString() != checksum(key).toString()) console.warn("CRC error");
 
         let result = new Uint8Array(key.length+cs_in.length)
         result.set(key)
@@ -87,11 +86,13 @@ export class Cipher {
             ptext = '',
             output_raw = new Uint8Array(ctext2.length);
         
-        for(let i of [...Array(ctext2.length).keys()]) {
+        for(let i = 0; i < ctext2.length; i++) {
             output_raw[i] = (10 + Math.floor(s[i] / 10) - Math.floor(ctext2[i] / 10)) % 10 * 10
             output_raw[i] += (10 + s[i] % 10 - ctext2[i] % 10) % 10
             ptext += charset[output_raw[i]]
         }
+        console.log(`"${ptext}"`)
+        console.log(output_raw)
 
         let index = tweak[0] - 1
         if(tweak[1] < 0)  {
@@ -127,7 +128,8 @@ export class Cipher {
 
             ctext += `${highDigit}${lowDigit}`;
         }
-        
-        return wrapText(mrkToStr(mrk) + ctext, groupN);
+
+        const regex = new RegExp(`.{1,${groupN}}`, 'g');
+        return ((mrkToStr(mrk) + ctext).match(regex) as RegExpMatchArray).join(' ')
     }
 }

@@ -21,6 +21,6 @@ describe("Cipher", () => {
         expect(c.encrypt("ТЕСТ", mrk)).toBe("38041 88931 77869 54905")
     })
     test("Decrypt", () => {
-        expect(c.decrypt("15855 40841 99886 93238").trim()).toBe("ТЕСТ")
+        expect(c.decrypt("7023 8033 0910 4080 7758 5613 5857 0310 7195 3198 8814 6627 9934 3228 8412 3330").trim()).toBe("WAKE UP, ВАСЯ / КГБ HAS YOU")
     })
 })
