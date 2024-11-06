@@ -15,10 +15,28 @@ export const sbox = [
 
 let eround = 0;
 
+/** Decryption options */
+export interface DecryptOptions {
+    /** optional */
+    tweak?: number[],
+    /** Decryption mode (Soon) */
+    mode?: 1 | 2
+}
+
+/** Encryption options */
+export interface EncryptOptions {
+    /** MRK (IV). Optional */
+    mrk?: Uint8Array,
+    /** Group length. Optional */
+    groupN?: number,
+    /** Encryption mode (Soon) */
+    mode?: 1 | 2
+}
+
 export const fromString = (hexString: string): Uint8Array => {
     let temp = Uint8Array.from((hexString.match(/.{1,2}/g) as RegExpMatchArray).map((byte) => parseInt(byte, 16)))
 
-    for(let i of [...Array(temp.length).keys()]) {
+    for(let i = 0; i < temp.length; i++) {
         temp[i] = (Math.floor(temp[i] / 16) * 10) + temp[i] % 16
     }
 
@@ -56,18 +74,10 @@ export const arraySum = (bu: Uint8Array): number => {
     return bu.reduce((acc, number) => acc + number, 0)
 }
 
-export const arrayCopy = (target: Uint8Array, source: Uint8Array, offset: number): Uint8Array => {
-    for (let i = 0; i < source.length; i++) {
-        target[i + offset] = source[i]
-    }
-
-    return target
-}
-
 export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint8Array => {
     let buffer = new Uint8Array(10).fill(0)
-    buffer = arrayCopy(buffer, mrk, 0)
-    buffer = arrayCopy(buffer, mrk, 5)
+    buffer.set(mrk);
+    buffer.set(mrk, 5)
 
     eround = arraySum(buffer) % 100
 
@@ -75,7 +85,7 @@ export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint
 
     for (let i = 0; i < 6; i++) {
         buffer = full_round(buffer, key)
-        temp = arrayCopy(temp, buffer, i * 10)
+        temp.set(buffer, i * 10);
     }
 
     let new_key = new Uint8Array(50).fill(0)
@@ -84,14 +94,14 @@ export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint
         new_key[i] = (key[i] + temp[i]) % 100
     }
 
-    let temp2 = new Uint8Array((blocks_n * 10)).fill(0)
+    temp = new Uint8Array((blocks_n * 10)).fill(0)
 
     for (let i = 0; i < blocks_n; i++) {
         buffer = full_round(buffer, new_key)
-        temp2 = arrayCopy(temp2, buffer, i * 10)
+        temp.set(buffer, i * 10);
     }
 
-    return temp2
+    return temp
 }
 
 export const checksum = (key: Uint8Array): Uint8Array => {
@@ -110,7 +120,7 @@ export const checksum = (key: Uint8Array): Uint8Array => {
 }
 
 
-export const prepare_ctext = (str: string, tweak: number[] = [0,0]) => {
+export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[] => {
     let temp = str.replaceAll(" ", "")
 
     let index = (tweak[0] - 1) * 2 + 10

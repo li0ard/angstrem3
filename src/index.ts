@@ -1,4 +1,4 @@
-import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream } from "./utils";
+import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream, type DecryptOptions, type EncryptOptions } from "./utils";
 
 /**
  * @hideconstructor
@@ -76,10 +76,12 @@ export class Cipher {
     /**
      * Decrypt text
      * @param ctext ciphertext
-     * @param tweak optional
+     * @param opts Decryption options
      * @returns {string}
      */
-    decrypt(ctext: string, tweak: number[] = [0,0]): string {
+    decrypt(ctext: string, opts: DecryptOptions = {}): string {
+        opts.tweak = opts.tweak || [0,0]
+        opts.mode = opts.mode || 1
         let [mrk, ctext2] = prepare_ctext(ctext)
 
         let s = stream(mrk, this.key, Math.ceil(ctext2.length / 10)),
@@ -92,9 +94,9 @@ export class Cipher {
             ptext += charset[output_raw[i]]
         }
 
-        let index = tweak[0] - 1
-        if(tweak[1] < 0)  {
-            ptext = ptext.slice(0, index) + ptext.slice(index + Math.ceil(-tweak[1] / 2))
+        let index = opts.tweak[0] - 1
+        if(opts.tweak[1] < 0)  {
+            ptext = ptext.slice(0, index) + ptext.slice(index + Math.ceil(-opts.tweak[1] / 2))
         }
         return ptext
     }
@@ -102,13 +104,15 @@ export class Cipher {
     /**
      * Encrypt text
      * @param ptext plaintext
-     * @param mrk MRK/МРК (IV). Optional
-     * @param groupN Group length. Optional
+     * @param opts Encryption options
      * @returns {string}
      */
-    encrypt(ptext: string, mrk: Uint8Array = Uint8Array.from({length: 5}, () => getRandomInt(0, 98)), groupN: number = 5): string {
-        const ctextLenWoMrk = (Math.ceil((10 + ptext.length * 2) / groupN) * groupN) - 10;
-        const s = stream(mrk, this.key, Math.ceil(ctextLenWoMrk / 10));
+    encrypt(ptext: string, opts: EncryptOptions = {}): string {
+        opts.mrk = opts.mrk || Uint8Array.from({length: 5}, () => getRandomInt(0, 98))
+        opts.groupN = opts.groupN || 5
+        opts.mode = opts.mode || 1
+        const ctextLenWoMrk = (Math.ceil((10 + ptext.length * 2) / opts.groupN) * opts.groupN) - 10;
+        const s = stream(opts.mrk, this.key, Math.ceil(ctextLenWoMrk / 10));
         const ctextRawLen = Math.ceil(ctextLenWoMrk / 2);
         
         let ctext = '';
@@ -127,7 +131,7 @@ export class Cipher {
             ctext += `${highDigit}${lowDigit}`;
         }
 
-        const regex = new RegExp(`.{1,${groupN}}`, 'g');
-        return ((mrkToStr(mrk) + ctext).match(regex) as RegExpMatchArray).join(' ')
+        const regex = new RegExp(`.{1,${opts.groupN}}`, 'g');
+        return ((mrkToStr(opts.mrk) + ctext).match(regex) as RegExpMatchArray).join(' ')
     }
 }
