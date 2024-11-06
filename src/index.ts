@@ -91,8 +91,6 @@ export class Cipher {
             output_raw[i] += (10 + s[i] % 10 - ctext2[i] % 10) % 10
             ptext += charset[output_raw[i]]
         }
-        console.log(`"${ptext}"`)
-        console.log(output_raw)
 
         let index = tweak[0] - 1
         if(tweak[1] < 0)  {

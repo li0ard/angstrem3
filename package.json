@@ -2,7 +2,7 @@
   "name": "@li0ard/angstrem3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "author": "li0ard",
   "repository": {
@@ -28,5 +28,11 @@
   "files": ["dist"],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "keywords": [
+    "crypto",
+    "mk85",
+    "encrypt",
+    "decrypt"
+  ]
 }

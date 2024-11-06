@@ -1,5 +1,3 @@
-# angstrem3
-
 ![](https://mk.bs0dd.net/mk85c/mk85cf.jpg)
 
 ## RUS:
