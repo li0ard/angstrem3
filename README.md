@@ -4,6 +4,10 @@
 
 Реализация алгоритма "Ангстрем-3" для Электроники МК-85С на TypeScript
 
+### Функции
+- Генерация долговременного ключа (ДКЛ)
+- Поддержка буквенного и цифрового (только расшифровка) режимов
+
 ### Установка
 ```bash
 npm i @li0ard/angstrem3
@@ -24,6 +28,10 @@ console.log(c.decrypt(enc)) // => ТЕСТ
 ## ENG:
 
 Implementation of the Angstrem-3 algorithm for Elektronika MK-85C in TypeScript
+
+### Features
+- New long-term key (DKL) generation
+- Support for alphanumeric and numeric (decryption only) modes
 
 ### Install
 ```bash

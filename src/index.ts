@@ -1,4 +1,4 @@
-import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream, type DecryptOptions, type EncryptOptions } from "./utils";
+import { charset, checksum, fromString2, fromString, getRandomInt, mrkToStr, prepare_ctext, stream, type DecryptOptions, type EncryptOptions, reverseStr, randomBytes } from "./utils";
 
 /**
  * @hideconstructor
@@ -9,7 +9,7 @@ export class Key {
      * @returns {Uint8Array}
      */
     static generate(): Uint8Array {
-        let key = Uint8Array.from({length: 50}, () => getRandomInt(0, 98)),
+        let key = randomBytes(50),
             cs = checksum(key);
 
         let result = new Uint8Array(key.length+cs.length)
@@ -98,7 +98,11 @@ export class Cipher {
         if(opts.tweak[1] < 0)  {
             ptext = ptext.slice(0, index) + ptext.slice(index + Math.ceil(-opts.tweak[1] / 2))
         }
-        return ptext
+        if(opts.mode == 1) {
+            return ptext
+        } else {
+            return reverseStr(parseInt(reverseStr(Array.from(output_raw).join(""))).toString())
+        }
     }
 
     /**
@@ -108,7 +112,7 @@ export class Cipher {
      * @returns {string}
      */
     encrypt(ptext: string, opts: EncryptOptions = {}): string {
-        opts.mrk = opts.mrk || Uint8Array.from({length: 5}, () => getRandomInt(0, 98))
+        opts.mrk = opts.mrk || randomBytes(5)
         opts.groupN = opts.groupN || 5
         opts.mode = opts.mode || 1
         const ctextLenWoMrk = (Math.ceil((10 + ptext.length * 2) / opts.groupN) * opts.groupN) - 10;

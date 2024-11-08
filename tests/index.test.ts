@@ -1,4 +1,4 @@
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, it } from "bun:test";
 import { Cipher, Key } from "../src";
 
 let keyStr = "84534 45986 35465 64750 69746 75562 96281 96471 16889 77629 94879 96394 73073 45415 29900 39356 54944 10712 85757 23266 32131 18232"
@@ -23,6 +23,11 @@ describe("Cipher", () => {
         })).toBe("38041 88931 77869 54905")
     })
     test("Decrypt", () => {
-        expect(c.decrypt("7023 8033 0910 4080 7758 5613 5857 0310 7195 3198 8814 6627 9934 3228 8412 3330").trim()).toBe("WAKE UP, ВАСЯ / КГБ HAS YOU")
+        it("Number-mode", () => {
+            expect(c.decrypt("11051 66762 64268", { mode: 2 })).toBe("123")
+        })
+        it("Text-mode", () => {
+            expect(c.decrypt("7023 8033 0910 4080 7758 5613 5857 0310 7195 3198 8814 6627 9934 3228 8412 3330").trim()).toBe("WAKE UP, ВАСЯ / КГБ HAS YOU")
+        })
     })
 })

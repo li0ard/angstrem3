@@ -132,8 +132,8 @@ export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[
         temp =  temp.slice(0, index) + temp.slice(index + tweak[1])
     }
 
-    if(temp.length % 2 != 0) {
-        temp.slice(0, temp.length-1)
+    if(temp.length % 2 !== 0) {
+        temp = temp.slice(0, -1)
     }
 
     let mrk = fromString(temp.slice(0,10))
@@ -143,7 +143,15 @@ export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[
 }
 
 
-export function mrkToStr(mrk: Uint8Array): string {
+export const mrkToStr = (mrk: Uint8Array): string => {
     if (mrk.length != 5) throw new Error(`Wrong key length. Expected 5, got ${mrk.length}`);
     return Array.from(mrk).map(num => num.toString().padStart(2, '0')).join('');
+}
+
+export const reverseStr = (input: string): string => {
+    return input.split('').reverse().join('');
+}
+
+export const randomBytes = (length: number) => {
+    return Uint8Array.from({length: length}, () => getRandomInt(0, 98))
 }
