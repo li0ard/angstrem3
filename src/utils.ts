@@ -17,9 +17,9 @@ let eround = 0;
 
 /** Decryption options */
 export interface DecryptOptions {
-    /** optional */
-    tweak?: number[],
-    /** Decryption mode (Soon) */
+    /** Tweak for Gamma correction (+/- 1) */
+    //tweak?: number[],
+    /** Decryption mode */
     mode?: 1 | 2
 }
 
@@ -27,8 +27,6 @@ export interface DecryptOptions {
 export interface EncryptOptions {
     /** MRK (IV). Optional */
     mrk?: Uint8Array,
-    /** Group length. Optional */
-    groupN?: number,
     /** Encryption mode (Soon) */
     mode?: 1 | 2
 }
