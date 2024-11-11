@@ -103,7 +103,7 @@ export class Cipher {
         if(opts.mode == 1) {
             return ptext
         } else {
-            return reverseStr(parseInt(reverseStr(Array.from(output_raw).join(""))).toString())
+            return reverseStr(parseInt(reverseStr(Array.from(output_raw).map(i => i.toString().padStart(2, "0")).join(""))).toString())
         }
     }
 
@@ -123,9 +123,10 @@ export class Cipher {
         let ctext = '';
 
         const ptextExtended = ptext.toUpperCase().padEnd(ctextRawLen, ' ');
+        const pTextRaw = fromString(ptext.padEnd(ctextRawLen, '0'))
 
-        for (let i = 0; i < ctextRawLen; i++) {
-            let temp = charset.indexOf(ptextExtended[i]);
+        for (let i = 0; i < (opts.mode == 1 ? ctextRawLen : pTextRaw.length); i++) {
+            let temp = opts.mode == 1 ? charset.indexOf(ptextExtended[i]) : pTextRaw[i];
             if (temp === -1) {
                 temp = 0;
             }

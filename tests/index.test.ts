@@ -18,15 +18,24 @@ describe("Cipher", () => {
     let c = new Cipher(keyArr)
     test("Encrypt", () => {
         let mrk = Uint8Array.from([ 38, 4, 18, 89, 31 ]);
+        let mrk2 = Uint8Array.from([ 44, 99, 43, 94, 23 ])
+
+        // Numeric mode
+        expect(c.encrypt("0102030405", {
+            mode: 2,
+            mrk: mrk2
+        })).toBe("44994 39423 00355 18566")
+
+        // Alphanumeric mode
         expect(c.encrypt("ТЕСТ", {
             mrk: mrk
         })).toBe("38041 88931 77869 54905")
     })
     test("Decrypt", () => {
-        // Number mode
+        // Numeric mode
         expect(c.decrypt("11051 66762 64268", { mode: 2 })).toBe("123")
         
-        // Text mode
+        // Alphanumeric mode
         expect(c.decrypt("7023 8033 0910 4080 7758 5613 5857 0310 7195 3198 8814 6627 9934 3228 8412 3330").trim()).toBe("WAKE UP, ВАСЯ / КГБ HAS YOU")
     })
 })

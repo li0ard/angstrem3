@@ -6,7 +6,7 @@
 
 ### Функции
 - Генерация долговременного ключа (ДКЛ)
-- Поддержка буквенного и цифрового (только расшифровка) режимов
+- Поддержка буквенного и цифрового режимов
 
 ### Установка
 ```bash
@@ -25,13 +25,15 @@ console.log(enc) // => 38041 88931 77869 54905
 console.log(c.decrypt(enc)) // => ТЕСТ
 ```
 
+Большое спасибо Bs0dd, MaFrance и kaseiiro за материалы по МК-85 и алгоритму
+
 ## ENG:
 
 Implementation of the Angstrem-3 algorithm for Elektronika MK-85C in TypeScript
 
 ### Features
 - New long-term key (DKL) generation
-- Support for alphanumeric and numeric (decryption only) modes
+- Support for alphanumeric and numeric modes
 
 ### Install
 ```bash
@@ -49,3 +51,5 @@ const enc = c.encrypt("ТЕСТ")
 console.log(enc) // => 38041 88931 77869 54905
 console.log(c.decrypt(enc)) // => ТЕСТ
 ```
+
+Thanks to Bs0dd, MaFrance and kaseiiro for materials on MK-85 and algorithm
