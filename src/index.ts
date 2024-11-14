@@ -82,9 +82,9 @@ export class Cipher {
      * @returns {string}
      */
     decrypt(ctextWithMrk: string, opts: DecryptOptions = {}): string {
-        //opts.tweak = opts.tweak || [0,0]
+        opts.tweak = opts.tweak || [0,0]
         opts.mode = opts.mode || 1
-        let [mrk, ctext] = prepare_ctext(ctextWithMrk)
+        let [mrk, ctext] = prepare_ctext(ctextWithMrk, opts.tweak)
 
         let sessionKey = stream(mrk, this.key, Math.ceil(ctext.length / 10)).slice(0,  ctext.length),
             ptext = '',
@@ -96,10 +96,10 @@ export class Cipher {
             ptext += charset[output_raw[i]]
         }
 
-        /*let index = opts.tweak[0] - 1
+        let index = opts.tweak[0] - 1
         if(opts.tweak[1] < 0)  {
             ptext = ptext.slice(0, index) + ptext.slice(index + Math.ceil(-opts.tweak[1] / 2))
-        }*/
+        }
         if(opts.mode == 1) {
             return ptext
         } else {

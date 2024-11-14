@@ -38,4 +38,16 @@ describe("Cipher", () => {
         // Alphanumeric mode
         expect(c.decrypt("7023 8033 0910 4080 7758 5613 5857 0310 7195 3198 8814 6627 9934 3228 8412 3330").trim()).toBe("WAKE UP, ВАСЯ / КГБ HAS YOU")
     })
+
+    test("Decrypt (+/- 1 tweak)", () => {
+        // -1 tweak
+        expect(c.decrypt("87809 90512 93160 35334 13 10843 34233 22345 40949", {
+            tweak: [7, -3]
+        })).toBe("ШИФРАТ ANCRIPT ")
+
+        // +1 tweak
+        expect(c.decrypt("87809 90512 93160 3530 35334 13316 10843 34233 22345 40949", {
+            tweak: [5, 4]
+        })).toBe("ШИФРАТОР ANCRIPT ")
+    })
 })

@@ -18,7 +18,7 @@ let eround = 0;
 /** Decryption options */
 export interface DecryptOptions {
     /** Tweak for Gamma correction (+/- 1) */
-    //tweak?: number[],
+    tweak?: number[],
     /** Decryption mode (1 - Alphanumeric, 2 - Numeric) */
     mode?: 1 | 2
 }
@@ -124,7 +124,7 @@ export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[
     let index = (tweak[0] - 1) * 2 + 10
 
     if (tweak[1] < 0) {
-        temp = temp.slice(0, index).padEnd((-tweak[1]), "0") + temp.slice(index)
+        temp = temp.slice(0, index) + '0'.repeat(-tweak[1]) + temp.slice(index)
     }
     if (tweak[1] > 0) {
         temp =  temp.slice(0, index) + temp.slice(index + tweak[1])
