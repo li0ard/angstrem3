@@ -1,11 +1,12 @@
 import { charset, checksum, fromString2, fromString, mrkToStr, prepare_ctext, stream, type DecryptOptions, type EncryptOptions, reverseStr, randomBytes } from "./utils";
 
 /**
+ * Key utils class
  * @hideconstructor
  */
 export class Key {
     /**
-     * Long-term key (DKL/ДКЛ) generation
+     * Generate new long-term key
      * @returns {Uint8Array}
      */
     static generate(): Uint8Array {
@@ -40,8 +41,8 @@ export class Key {
     }
 
     /**
-     * Parse long-term key to string
-     * @param str serialized key
+     * Parse long-term key from string
+     * @param str Serialized key
      * @returns {Uint8Array}
      */
     static fromString(str: string): Uint8Array {
@@ -50,9 +51,9 @@ export class Key {
 
         let key = fromString(temp.slice(0, 100))
         let cs_in = fromString2(temp.slice(100, 110))
-        if(cs_in.toString() != checksum(key).toString()) console.warn("CRC error");
+        if(cs_in.toString() != checksum(key).toString()) console.warn("[Key.fromString] Key has incorrect checksum");
 
-        let result = new Uint8Array(key.length+cs_in.length)
+        let result = new Uint8Array(key.length + cs_in.length)
         result.set(key)
         result.set(cs_in, key.length)
 
@@ -67,6 +68,11 @@ export class Cipher {
     key: Uint8Array
     groupN: number
 
+    /**
+     * Initializing cipher
+     * @param key Long-term key
+     * @param groupN Length of ciphertext group
+     */
     constructor(key: Uint8Array | string, groupN: number = 5) {
         if(typeof key == "string") {
             key = Key.fromString(key)
@@ -76,8 +82,8 @@ export class Cipher {
     }
 
     /**
-     * Decrypt text
-     * @param ctextWithMrk ciphertext
+     * Decryption operation
+     * @param ctextWithMrk Ciphertext
      * @param opts Decryption options
      * @returns {string}
      */
@@ -108,8 +114,8 @@ export class Cipher {
     }
 
     /**
-     * Encrypt text
-     * @param ptext plaintext
+     * Encryption operation
+     * @param ptext Plaintext
      * @param opts Encryption options
      * @returns {string}
      */

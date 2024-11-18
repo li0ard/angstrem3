@@ -33,7 +33,7 @@ console.log(c.decrypt(enc)) // => ТЕСТ
 Implementation of the Angstrem-3 algorithm for Elektronika MK-85C in TypeScript
 
 ### Features
-- New long-term key (DKL) generation
+- Support for long-term key generation
 - Support for alphanumeric and numeric modes
 - Support for distortion correction during decryption
 

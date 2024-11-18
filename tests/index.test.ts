@@ -40,12 +40,12 @@ describe("Cipher", () => {
     })
 
     test("Decrypt (+/- 1 tweak)", () => {
-        // -1 tweak
+        // -1 tweak, Part of the ciphertext is lost
         expect(c.decrypt("87809 90512 93160 35334 13 10843 34233 22345 40949", {
             tweak: [7, -3]
         })).toBe("ШИФРАТ ANCRIPT ")
 
-        // +1 tweak
+        // +1 tweak, Duplication of ciphertext digits
         expect(c.decrypt("87809 90512 93160 3530 35334 13316 10843 34233 22345 40949", {
             tweak: [5, 4]
         })).toBe("ШИФРАТОР ANCRIPT ")

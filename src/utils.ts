@@ -1,5 +1,7 @@
+/** Cipher charset (Tweaked KOI-8) */
 export const charset = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[Ъ]…ЁЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧ█    '
 
+/** S-BOX */
 export const sbox = [
     0x06, 0x0E, 0x28, 0x42, 0x56, 0x08, 0x52, 0x55, 0x4D, 0x44,
     0x43, 0x02, 0x1A, 0x17, 0x35, 0x33, 0x61, 0x46, 0x30, 0x39,
@@ -17,7 +19,7 @@ let eround = 0;
 
 /** Decryption options */
 export interface DecryptOptions {
-    /** Tweak for Gamma correction (+/- 1) */
+    /** Tweak for ciphertext correction (+/- 1). See section 10 in [this](https://mk.bs0dd.net/mk85c/AZIMUT.pdf) manual (Russian language) */
     tweak?: number[],
     /** Decryption mode (1 - Alphanumeric, 2 - Numeric) */
     mode?: 1 | 2
@@ -25,14 +27,19 @@ export interface DecryptOptions {
 
 /** Encryption options */
 export interface EncryptOptions {
-    /** MRK (IV). Optional */
+    /** Markant (MRK/IV) */
     mrk?: Uint8Array,
     /** Encryption mode (1 - Alphanumeric, 2 - Numeric) */
     mode?: 1 | 2
 }
 
-export const fromString = (hexString: string): Uint8Array => {
-    let temp = Uint8Array.from((hexString.match(/.{1,2}/g) as RegExpMatchArray).map((byte) => parseInt(byte, 16)))
+/**
+ * Convert numeric string to `Uint8Array` (Byte is 0 to 99)
+ * @param str String
+ * @returns {Uint8Array}
+ */
+export const fromString = (str: string): Uint8Array => {
+    let temp = Uint8Array.from((str.match(/.{1,2}/g) as RegExpMatchArray).map((byte) => parseInt(byte, 16)))
 
     for(let i = 0; i < temp.length; i++) {
         temp[i] = (Math.floor(temp[i] / 16) * 10) + temp[i] % 16
@@ -41,16 +48,34 @@ export const fromString = (hexString: string): Uint8Array => {
     return temp
 }
 
+/**
+ * Convert numeric string to `Uint8Array` (Byte is 0 to 9)
+ * @param str String
+ * @returns {Uint8Array}
+ */
 export const fromString2 = (str: string): Uint8Array => {
     return new Uint8Array([...str].map(char => parseInt(char)));
 }
 
+/**
+ * Generate random number
+ * @param min Minimum value
+ * @param max Maximum value
+ * @returns {number}
+ */
 export const getRandomInt = (min: number, max: number): number => {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+/**
+ * Proceed elementary part of round for data
+ * @param data Data
+ * @param key Key
+ * @param offset Data offset
+ * @returns {Uint8Array}
+ */
 export const elementary_round = (data: Uint8Array, key: Uint8Array, offset: number): Uint8Array => {
     let R0 = (sbox[eround] + key[offset]) % 100
     let R2 = data[offset % 10]
@@ -60,6 +85,12 @@ export const elementary_round = (data: Uint8Array, key: Uint8Array, offset: numb
     return data
 }
 
+/**
+ * Proceed full round for data
+ * @param data Data
+ * @param key Key
+ * @returns {Uint8Array}
+ */
 export const full_round = (data: Uint8Array, key: Uint8Array): Uint8Array => {
     for (let i = 0; i < 50; i++) {
         data = elementary_round(data, key, i)
@@ -68,10 +99,22 @@ export const full_round = (data: Uint8Array, key: Uint8Array): Uint8Array => {
     return data
 }
 
-export const arraySum = (bu: Uint8Array): number => {
-    return bu.reduce((acc, number) => acc + number, 0)
+/**
+ * Sum of array elements
+ * @param array Array
+ * @returns {number}
+ */
+export const arraySum = (array: Uint8Array): number => {
+    return array.reduce((acc, number) => acc + number, 0)
 }
 
+/**
+ * Get stream for operations from markant and long-term key
+ * @param mrk Markant (MRK)
+ * @param key Long-term key
+ * @param blocks_n Number of blocks (`blocks_n` * 10) 
+ * @returns {Uint8Array}
+ */
 export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint8Array => {
     let buffer = new Uint8Array(10).fill(0)
     buffer.set(mrk);
@@ -102,6 +145,11 @@ export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint
     return temp
 }
 
+/**
+ * CRC function (used for key generation)
+ * @param key Long-term key
+ * @returns {Uint8Array}
+ */
 export const checksum = (key: Uint8Array): Uint8Array => {
     let cs_mask = [1, 0, 7, 5, 3, 2, 9, 8, 4, 6],
         mrk = Uint8Array.from([0x4A, 0x38, 0x0E, 0x21, 0x09]);
@@ -117,7 +165,12 @@ export const checksum = (key: Uint8Array): Uint8Array => {
     return cs
 }
 
-
+/**
+ * Separating markant (MRK) from ciphertext and correcting ciphertext (if necessary)
+ * @param str Ciphertext
+ * @param tweak Tweak for ciphertext correction
+ * @returns {Uint8Array}
+ */
 export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[] => {
     let temp = str.replaceAll(" ", "")
 
@@ -140,16 +193,31 @@ export const prepare_ctext = (str: string, tweak: number[] = [0,0]): Uint8Array[
     return [mrk, ctext]
 }
 
-
+/**
+ * Convert markant (as `Uint8Array`) to string
+ * @param mrk 
+ * @returns {string}
+ */
 export const mrkToStr = (mrk: Uint8Array): string => {
-    if (mrk.length != 5) throw new Error(`Wrong key length. Expected 5, got ${mrk.length}`);
+    if (mrk.length != 5) throw new Error(`Wrong markant length. Expected 5, got ${mrk.length}`);
     return Array.from(mrk).map(num => num.toString().padStart(2, '0')).join('');
 }
 
+/**
+ * Reverse string
+ * @param input Input string
+ * @returns {string}
+ */
 export const reverseStr = (input: string): string => {
     return input.split('').reverse().join('');
 }
 
-export const randomBytes = (length: number) => {
+/**
+ * Generate `Uint8Array` filled with random numbers
+ * @param length Length of output array
+ * @returns {Uint8Array}
+ */
+export const randomBytes = (length: number): Uint8Array => {
+    // Should we use CSPRNG ??
     return Uint8Array.from({length: length}, () => getRandomInt(0, 98))
 }
