@@ -10,7 +10,7 @@ describe("Keys", () => {
     })
 
     test("fromString", () => {
-        expect(Key.fromString(keyStr).toString()).toBe(keyArr.toString())
+        expect(Key.fromString(keyStr)).toStrictEqual(keyArr)
     })
 })
 
@@ -49,5 +49,9 @@ describe("Cipher", () => {
         expect(c.decrypt("87809 90512 93160 3530 35334 13316 10843 34233 22345 40949", {
             tweak: [5, 4]
         })).toBe("ШИФРАТОР ANCRIPT ")
+    })
+
+    test("Simple MAC", () => {
+        expect(c.mac("12345678902222222222")).toBe("1988480621")
     })
 })

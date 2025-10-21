@@ -1,0 +1,12 @@
+{
+    "name": "@li0ard/angstrem3",
+    "version": "0.2.3",
+    "exports": "./src/index.ts",
+    "publish": {
+        "include": [
+            "LICENSE",
+            "README.md",
+            "src/**/*.ts"
+        ]
+    }
+}

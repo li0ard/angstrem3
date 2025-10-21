@@ -1,4 +1,4 @@
-import { charset, checksum, fromString2, fromString, mrkToStr, prepare_ctext, stream, type DecryptOptions, type EncryptOptions, reverseStr, randomBytes } from "./utils";
+import { charset, checksum, fromString2, fromString, mrkToStr, prepare_ctext, type DecryptOptions, type EncryptOptions, reverseStr, randomBytes, sbox, arraySum, stream, concatBytes } from "./utils";
 
 /**
  * Key utils class
@@ -10,14 +10,9 @@ export class Key {
      * @returns {Uint8Array}
      */
     static generate(): Uint8Array {
-        let key = randomBytes(50),
-            cs = checksum(key);
+        let key = randomBytes(50);
 
-        let result = new Uint8Array(key.length+cs.length)
-        result.set(key)
-        result.set(cs, key.length)
-
-        return result
+        return concatBytes(key, checksum(key))
     }
 
     /**
@@ -27,7 +22,6 @@ export class Key {
      */
     static toString(key: Uint8Array): string {
         if(key.length != 60) throw new Error(`Wrong key length. Expected 60, got ${key.length}`);
-
         let s = ""
 
         for(let i = 0; i < 50; i++) {
@@ -53,11 +47,7 @@ export class Key {
         let cs_in = fromString2(temp.slice(100, 110))
         if(cs_in.toString() != checksum(key).toString()) console.warn("[Key.fromString] Key has incorrect checksum");
 
-        let result = new Uint8Array(key.length + cs_in.length)
-        result.set(key)
-        result.set(cs_in, key.length)
-
-        return result
+        return concatBytes(key, cs_in)
     }
 }
 
@@ -66,39 +56,38 @@ export class Key {
  */
 export class Cipher {
     key: Uint8Array
-    groupN: number
+    eround: number = 0
 
     /**
      * Initializing cipher
      * @param key Long-term key
      * @param groupN Length of ciphertext group
      */
-    constructor(key: Uint8Array | string, groupN: number = 5) {
+    constructor(key: Uint8Array | string, public groupN: number = 5) {
         if(typeof key == "string") {
             key = Key.fromString(key)
         }
         this.key = key
-        this.groupN = groupN
     }
 
     /**
      * Decryption operation
-     * @param ctextWithMrk Ciphertext
+     * @param data Encrypted data
      * @param opts Decryption options
      * @returns {string}
      */
-    decrypt(ctextWithMrk: string, opts: DecryptOptions = {}): string {
+    public decrypt(data: string, opts: DecryptOptions = {}): string {
         opts.tweak = opts.tweak || [0,0]
         opts.mode = opts.mode || 1
-        let [mrk, ctext] = prepare_ctext(ctextWithMrk, opts.tweak)
+        let [mrk, ctext] = prepare_ctext(data, opts.tweak)
 
-        let sessionKey = stream(mrk, this.key, Math.ceil(ctext.length / 10)).slice(0,  ctext.length),
+        let keystream = stream(mrk, this.key, Math.ceil(ctext.length / 10)),
             ptext = '',
             output_raw = new Uint8Array(ctext.length);
         
         for(let i = 0; i < ctext.length; i++) {
-            output_raw[i] = (10 + Math.floor(sessionKey[i] / 10) - Math.floor(ctext[i] / 10)) % 10 * 10
-            output_raw[i] += (10 + sessionKey[i] % 10 - ctext[i] % 10) % 10
+            output_raw[i] = (10 + Math.floor(keystream[i] / 10) - Math.floor(ctext[i] / 10)) % 10 * 10
+            output_raw[i] += (10 + keystream[i] % 10 - ctext[i] % 10) % 10
             ptext += charset[output_raw[i]]
         }
 
@@ -106,44 +95,47 @@ export class Cipher {
         if(opts.tweak[1] < 0)  {
             ptext = ptext.slice(0, index) + ptext.slice(index + Math.ceil(-opts.tweak[1] / 2))
         }
-        if(opts.mode == 1) {
-            return ptext
-        } else {
-            return reverseStr(parseInt(reverseStr(Array.from(output_raw).map(i => i.toString().padStart(2, "0")).join(""))).toString())
-        }
+        if(opts.mode == 1) return ptext;
+        return reverseStr(parseInt(reverseStr(Array.from(output_raw).map(i => i.toString().padStart(2, "0")).join(""))).toString())
     }
 
     /**
      * Encryption operation
-     * @param ptext Plaintext
+     * @param data Plaintext
      * @param opts Encryption options
      * @returns {string}
      */
-    encrypt(ptext: string, opts: EncryptOptions = {}): string {
+    public encrypt(data: string, opts: EncryptOptions = {}): string {
         opts.mrk = opts.mrk || randomBytes(5)
         opts.mode = opts.mode || 1
-        const ctextLenWoMrk = (Math.ceil((10 + ptext.length * 2) / this.groupN) * this.groupN) - 10;
-        const sessionKey = stream(opts.mrk, this.key, Math.ceil(ctextLenWoMrk / 10)).slice(0, ctextLenWoMrk);
+        const ctextLenWoMrk = (Math.ceil((10 + data.length * 2) / this.groupN) * this.groupN) - 10;
+        const keystream = stream(opts.mrk, this.key, Math.ceil(ctextLenWoMrk / 10));
         const ctextRawLen = Math.ceil(ctextLenWoMrk / 2);
         
         let ctext = '';
 
-        const ptextExtended = ptext.toUpperCase().padEnd(ctextRawLen, ' ');
-        const pTextRaw = fromString(ptext.padEnd(ctextRawLen, '0'))
+        const ptextExtended = data.toUpperCase().padEnd(ctextRawLen, ' ');
+        const pTextRaw = fromString(data.padEnd(ctextRawLen, '0'))
 
         for (let i = 0; i < (opts.mode == 1 ? ctextRawLen : pTextRaw.length); i++) {
             let temp = opts.mode == 1 ? charset.indexOf(ptextExtended[i]) : pTextRaw[i];
-            if (temp === -1) {
-                temp = 0;
-            }
+            if (temp === -1) temp = 0;
 
-            const highDigit = (10 + Math.floor(sessionKey[i] / 10) - Math.floor(temp / 10)) % 10;
-            const lowDigit = (10 + sessionKey[i] % 10 - temp % 10) % 10;
+            const highDigit = (10 + Math.floor(keystream[i] / 10) - Math.floor(temp / 10)) % 10;
+            const lowDigit = (10 + keystream[i] % 10 - temp % 10) % 10;
 
             ctext += `${highDigit}${lowDigit}`;
         }
 
-        const regex = new RegExp(`.{1,${this.groupN}}`, 'g');
-        return ((mrkToStr(opts.mrk) + ctext).match(regex) as RegExpMatchArray).join(' ')
+        return ((mrkToStr(opts.mrk) + ctext).match(new RegExp(`.{1,${this.groupN}}`, 'g')) as RegExpMatchArray).join(' ')
+    }
+
+    mac(text: string) {
+        let splitted = text.match(/.{1,10}/g)?.map(i => i.padEnd(10, "0")) as string[]
+        let block = "0000000000"
+        for(let i of splitted) {
+            block = this.decrypt(`${i}${block}`, {mode: 2})
+        }
+        return block
     }
 }

@@ -116,26 +116,24 @@ export const arraySum = (array: Uint8Array): number => {
  * @returns {Uint8Array}
  */
 export const stream = (mrk: Uint8Array, key: Uint8Array, blocks_n: number): Uint8Array => {
-    let buffer = new Uint8Array(10).fill(0)
-    buffer.set(mrk);
-    buffer.set(mrk, 5)
+    let buffer = concatBytes(mrk, mrk)
 
     eround = arraySum(buffer) % 100
 
-    let temp = new Uint8Array(60).fill(0)
+    let temp = new Uint8Array(60)
 
     for (let i = 0; i < 6; i++) {
         buffer = full_round(buffer, key)
         temp.set(buffer, i * 10);
     }
 
-    let new_key = new Uint8Array(50).fill(0)
+    let new_key = new Uint8Array(50)
 
     for (let i = 0; i < 50; i++) {
         new_key[i] = (key[i] + temp[i]) % 100
     }
 
-    temp = new Uint8Array((blocks_n * 10)).fill(0)
+    temp = new Uint8Array((blocks_n * 10))
 
     for (let i = 0; i < blocks_n; i++) {
         buffer = full_round(buffer, new_key)
@@ -155,7 +153,7 @@ export const checksum = (key: Uint8Array): Uint8Array => {
         mrk = Uint8Array.from([0x4A, 0x38, 0x0E, 0x21, 0x09]);
 
     let cs_raw = stream(mrk, key, 1)
-    let cs = new Uint8Array(10).fill(0)
+    let cs = new Uint8Array(10)
 
     for (let i = 0; i < 5; i++) {
         cs[i * 2] = (10 + Math.floor(cs_raw[i] / 10) - cs_mask[i * 2]) % 10
@@ -220,4 +218,19 @@ export const reverseStr = (input: string): string => {
 export const randomBytes = (length: number): Uint8Array => {
     // Should we use CSPRNG ??
     return Uint8Array.from({length: length}, () => getRandomInt(0, 98))
+}
+
+export function concatBytes(...arrays: Uint8Array[]): Uint8Array {
+    let sum = 0;
+    for (let i = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        sum += a.length;
+    }
+    const res = new Uint8Array(sum);
+    for (let i = 0, pad = 0; i < arrays.length; i++) {
+        const a = arrays[i];
+        res.set(a, pad);
+        pad += a.length;
+    }
+    return res;
 }
