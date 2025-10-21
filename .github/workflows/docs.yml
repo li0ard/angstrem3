@@ -1,3 +1,5 @@
+# thx for @teidesu
+
 name: Docs
 
 on:
@@ -34,13 +36,13 @@ jobs:
           bun run docs 
           touch docs/.nojekyll
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs
   # Deployment job
   deploy:
-    # only run on releases
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # only run on releases and dont run on forks
+    if: github.repository == 'li0ard/angstrem3' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -50,4 +52,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
