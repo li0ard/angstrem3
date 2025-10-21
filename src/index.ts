@@ -121,7 +121,7 @@ export class Cipher {
      * Calculate MAC
      * @param text Input text
      */
-    public mac(text: string) {
+    public mac(text: string): string {
         const splitted = text.match(/.{1,10}/g)?.map(i => i.padEnd(10, "0"))!;
         let block = "0000000000";
         for(let i of splitted) block = this.decrypt(`${i}${block}`, {mode: 2});
