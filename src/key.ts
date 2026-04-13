@@ -36,6 +36,13 @@ export class Key {
         return concatBytes(key, csIn);
     }
 
+    /** Validate key */
+    static validate(key: Uint8Array | string): boolean {
+        if(typeof key == "string") key = Key.fromString(key);
+        if (key.length !== 60) return false;
+        return this.arraysEqual(this.computeChecksum(key.slice(0, 50)), key.slice(50));
+    }
+
     private static computeChecksum(key: Uint8Array): Uint8Array {
         const csRaw = Angstrem3Core.generateKeystream(this.CHECKSUM_MRK, key, 1).slice(0, 5);
         const cs = new Uint8Array(10);
