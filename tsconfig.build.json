@@ -25,6 +25,5 @@
       "noPropertyAccessFromIndexSignature": false,
       "outDir": "dist",
       "rootDir": "src"
-    },
-    "include": ["src/index.ts"]
+    }
   }
