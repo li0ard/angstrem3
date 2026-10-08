@@ -1,74 +1,66 @@
-import { Angstrem3Core } from "./core.js";
-import { concatBytes, randomBytes } from "./utils.js";
+import { keystream } from "./index.js";
+import { KEY_LENGTH, KEY_UNITS, MRK_LENGTH, chunk, digitsToUnits, isDigits, randomUnits, unitsToDigits } from "./utils.js";
+
+const CHECKSUM_MASK = [1, 0, 7, 5, 3, 2, 9, 8, 4, 6];
+const CHECKSUM_MRK = Uint8Array.from([0x4a, 0x38, 0x0e, 0x21, 0x09]);
+
+const concat = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+    const res = new Uint8Array(a.length + b.length);
+    res.set(a, 0);
+    res.set(b, a.length);
+    return res;
+}
 
 /** Key utils class */
 export class Key {
-    private static readonly CS_MASK = [1, 0, 7, 5, 3, 2, 9, 8, 4, 6];
-    private static readonly CHECKSUM_MRK = Uint8Array.from([0x4A, 0x38, 0x0E, 0x21, 0x09]);
-
     /** Generate new long-term key */
     static generate(): Uint8Array {
-        const key = randomBytes(50);
-        
-        return concatBytes(key, this.computeChecksum(key));
+        const key = randomUnits(KEY_UNITS);
+        return concat(key, Key.checksum(key));
     }
 
-    /** Serialize key to string */
-    static toString(key: Uint8Array): string {
-        if (key.length !== 60) throw new Error(`Wrong key length. Expected 60, got ${key.length}`);
-        
-        let s = "";
-        for (let i = 0; i < 50; i++) s += key[i].toString().padStart(2, "0");
-        for (let i = 50; i < 60; i++) s += key[i].toString();
-
-        return s.match(/.{1,5}/g)!.join(" ");
-    }
-
-    /** Parse long-term key from string */
-    static fromString(str: string): Uint8Array {
-        const temp = str.replaceAll(' ', '');
-        if (temp.length !== 110) throw new Error(`Wrong key length. Expected 110, got ${temp.length}`);
-
-        const key = this.parseKeyPart(temp.slice(0, 100));
-        const csIn = this.parseChecksumPart(temp.slice(100, 110));
-        if(!this.arraysEqual(csIn, this.computeChecksum(key))) console.warn("[Key.fromString] Key has incorrect checksum");
-
-        return concatBytes(key, csIn);
-    }
-
-    /** Validate key */
-    static validate(key: Uint8Array | string): boolean {
-        if(typeof key == "string") key = Key.fromString(key);
-        if (key.length !== 60) return false;
-        return this.arraysEqual(this.computeChecksum(key.slice(0, 50)), key.slice(50));
-    }
-
-    private static computeChecksum(key: Uint8Array): Uint8Array {
-        const csRaw = Angstrem3Core.generateKeystream(this.CHECKSUM_MRK, key, 1).slice(0, 5);
+    /**
+     * Key checksum: 10 single digits
+     * @param key Long-term key (only the first 50 units are used)
+     */
+    static checksum(key: Uint8Array): Uint8Array {
+        const raw = keystream(key, CHECKSUM_MRK, MRK_LENGTH);
         const cs = new Uint8Array(10);
-
-        for (let i = 0; i < 5; i++) {
-            cs[i * 2] = (10 + Math.floor(csRaw[i] / 10) - this.CS_MASK[i * 2]) % 10;
-            cs[i * 2 + 1] = (10 + csRaw[i] % 10 - this.CS_MASK[i * 2 + 1]) % 10;
+        for (let i = 0; i < MRK_LENGTH; i++) {
+            cs[i * 2] = (10 + Math.floor(raw[i] / 10) - CHECKSUM_MASK[i * 2]) % 10;
+            cs[i * 2 + 1] = (10 + (raw[i] % 10) - CHECKSUM_MASK[i * 2 + 1]) % 10;
         }
         return cs;
     }
 
-    private static parseKeyPart(str: string): Uint8Array {
-        const hexPairs = str.match(/.{1,2}/g) || [];
-        return Uint8Array.from(hexPairs.map(pair => {
-            const hexVal = parseInt(pair, 16);
-            return (Math.floor(hexVal / 16) * 10) + (hexVal % 16);
-        }));
+    /** Check that the checksum part of the key is consistent with its body */
+    static verify(key: Uint8Array): boolean {
+        if (key.length !== KEY_LENGTH) return false;
+        const expected = Key.checksum(key.subarray(0, KEY_UNITS));
+        return expected.every((d, i) => d === key[KEY_UNITS + i]);
     }
 
-    private static parseChecksumPart(str: string): Uint8Array {
-        return Uint8Array.from([...str].map(c => parseInt(c, 10)));
+    /** Serialize key to string */
+    static toString(key: Uint8Array): string {
+        if (key.length !== KEY_LENGTH)
+            throw new Error(`Wrong key length. Expected ${KEY_LENGTH}, got ${key.length}`);
+        const body = unitsToDigits(key.subarray(0, KEY_UNITS));
+        const checksum = Array.from(key.subarray(KEY_UNITS)).join("");
+        return chunk(body + checksum, 5).join(" ");
     }
 
-    private static arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
-        if (a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-        return true;
+    /** Parse long-term key from string */
+    static fromString(str: string): Uint8Array {
+        const digits = str.replace(/\s+/g, "");
+        if (digits.length !== 110)
+            throw new Error(`Wrong key length. Expected 110, got ${digits.length}`);
+        if (!isDigits(digits))
+            throw new Error("Key must contain only decimal digits");
+
+        const key = concat(digitsToUnits(digits.slice(0, 100)), Uint8Array.from(digits.slice(100), Number));
+        if (!Key.verify(key))
+            console.warn("[Key.fromString] Key has incorrect checksum");
+
+        return key;
     }
 }

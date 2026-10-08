@@ -1,106 +1,103 @@
-import { charset, concatBytes } from "./utils.js";
+import { CHARSET, MRK_DIGITS, MRK_LENGTH, chunk, digitsToUnits, isDigits, unitsToDigits } from "./utils.js";
 
-export type CipherMode = 'alphanumeric' | 'numeric';
+/** Message mode */
+export const Mode = {
+    /** Text: every character is one unit (index in `CHARSET`) */
+    Alphanumeric: 1,
+    /** Digits: every two digits are one unit */
+    Numeric: 2,
+} as const;
+export type Mode = (typeof Mode)[keyof typeof Mode];
 
-export interface CodecOptions {
-    groupSize?: number;
-}
+/**
+ * Tweak for ciphertext correction (+/- 1).
+ * See section 10 in [this](https://mk.bs0dd.net/mk85c/AZIMUT.pdf) manual (Russian language).
+ *
+ * `[position, shift]`: `position` is the 1-based number of the first damaged unit,
+ * `shift` is `< 0` if digits were lost (|shift| zeros are inserted) and `> 0` if digits were duplicated
+ * (`shift` digits are removed).
+ */
+export type Tweak = readonly [position: number, shift: number];
+
 
 export class MessageCodec {
-    constructor(public readonly groupSize: number = 5) {}
-
-    encode(text: string, mode: CipherMode, targetLength?: number): Uint8Array {
-        return mode === 'numeric' 
-            ? this.encodeNumeric(text, targetLength)
-            : this.encodeAlphanumeric(text, targetLength);
+    constructor(public readonly groupN: number = 5) {
+        if (!Number.isInteger(groupN) || groupN < 1)
+            throw new Error("groupN must be a positive integer");
     }
 
-    decode(buffer: Uint8Array, mode: CipherMode, originalLength?: number): string {
-        return mode === 'numeric'
-            ? this.decodeNumeric(buffer, originalLength)
-            : this.decodeAlphanumeric(buffer, originalLength);
+    encodeText(text: string): Uint8Array {
+        const chars = Array.from(text.toUpperCase());
+        const units = new Uint8Array(this.paddedLength(chars.length)); // 0 == ' '
+        chars.forEach((ch, i) => (units[i] = Math.max(CHARSET.indexOf(ch), 0)));
+        return units;
     }
 
-    private encodeAlphanumeric(text: string, padTo?: number): Uint8Array {
-        const buffer = Uint8Array.from(text.toUpperCase().split('').map(ch => {
-            const idx = charset.indexOf(ch);
-            return idx === -1 ? 0 : idx;
-        }));
-        
-        if (padTo !== undefined && buffer.length < padTo) {
-            const padded = new Uint8Array(padTo);
-            padded.set(buffer);
-            padded.fill(0, buffer.length);
-            return padded;
+    decodeText(units: ArrayLike<number>): string {
+        return Array.from(units, (u) => CHARSET[u]).join("");
+    }
+
+    encodeNumber(digits: string): Uint8Array {
+        if (!isDigits(digits))
+            throw new Error("Numeric message must contain only digits");
+        const padded = digits.padEnd(this.paddedLength(digits.length), "0");
+        return digitsToUnits(padded.length % 2 === 0 ? padded : padded + "0");
+    }
+
+    decodeNumber(units: ArrayLike<number>): string {
+        const digits = unitsToDigits(units);
+        return digits.replace(/0+$/, "") || digits.slice(0, 1);
+    }
+
+
+    paddedLength(length: number): number {
+        const total = Math.ceil((MRK_DIGITS + length * 2) / this.groupN) * this.groupN;
+        return Math.ceil((total - MRK_DIGITS) / 2);
+    }
+
+    frame(mrk: Uint8Array, cipher: Uint8Array): string {
+        if (mrk.length !== MRK_LENGTH)
+            throw new Error(`Wrong markant length. Expected ${MRK_LENGTH}, got ${mrk.length}`);
+        return chunk(unitsToDigits(mrk) + unitsToDigits(cipher), this.groupN).join(" ");
+    }
+
+    unframe(wire: string, tweak: Tweak = [0, 0]): { mrk: Uint8Array; cipher: Uint8Array } {
+        let digits = wire.replace(/\s+/g, "");
+        if (!isDigits(digits))
+            throw new Error("Ciphertext must contain only digits and spaces");
+
+        const [position, shift] = tweak;
+        if (shift !== 0) {
+            const index = this.tweakIndex(position) * 2 + MRK_DIGITS;
+            if (shift < 0)
+                digits = digits.slice(0, index) + "0".repeat(-shift) + digits.slice(index);
+            else digits = digits.slice(0, index) + digits.slice(index + shift);
         }
-        return buffer;
-    }
+        if (digits.length % 2 !== 0) digits = digits.slice(0, -1);
+        if (digits.length < MRK_DIGITS)
+            throw new Error(`Ciphertext is too short: markant needs ${MRK_DIGITS} digits`);
 
-    private decodeAlphanumeric(buffer: Uint8Array, trimLength?: number): string {
-        const limit = trimLength ?? buffer.length;
-        return Array.from(buffer.slice(0, limit))
-            .map(b => charset[b % 100])
-            .join('')
-            .trimEnd();
-    }
-
-    private encodeNumeric(text: string, padTo?: number): Uint8Array {
-        const digits = text.replace(/\D/g, '');
-        const padded = digits.length % 2 === 1 ? digits + '0' : digits;
-        
-        const buffer = Uint8Array.from(
-            (padded.match(/.{1,2}/g) || []).map(pair => parseInt(pair, 10))
-        );
-        
-        if (padTo !== undefined && buffer.length < padTo) {
-            const result = new Uint8Array(padTo);
-            result.set(buffer);
-            result.fill(0, buffer.length);
-            return result;
+        return {
+            mrk: digitsToUnits(digits.slice(0, MRK_DIGITS)),
+            cipher: digitsToUnits(digits.slice(MRK_DIGITS)),
         }
-        return buffer;
     }
 
-    private decodeNumeric(buffer: Uint8Array, trimLength?: number): string {
-        const limit = trimLength ?? buffer.length;
-        const digitPairs = Array.from(buffer.slice(0, limit))
-            .map(b => (b % 100).toString().padStart(2, '0'));
-        
-        let result = digitPairs.join('');
-        
-        result = result.replace(/0+$/, '') || '0';
-        return result;
+    stripInserted(plain: Uint8Array, tweak: Tweak = [0, 0]): Uint8Array {
+        const [position, shift] = tweak;
+        if (shift >= 0) return plain;
+
+        const index = this.tweakIndex(position);
+        const garbage = Math.ceil(-shift / 2);
+        const res = new Uint8Array(Math.max(plain.length - garbage, index));
+        res.set(plain.subarray(0, index));
+        res.set(plain.subarray(index + garbage), index);
+        return res;
     }
 
-    prependMrk(payload: Uint8Array, mrk: Uint8Array): Uint8Array {
-        if (mrk.length !== 5) throw new Error(`MRK must be 5 bytes`);
-
-        return concatBytes(mrk, payload);
-    }
-
-    extractMrk(data: Uint8Array): { mrk: Uint8Array; payload: Uint8Array } {
-        if (data.length < 5) throw new Error("Data too short for MRK");
-        return { mrk: data.slice(0, 5), payload: data.slice(5) }
-    }
-
-    format(buffer: Uint8Array): string {
-        const digits = Array.from(buffer)
-            .map(b => (b % 100).toString().padStart(2, '0'))
-            .join('');
-        return digits.match(new RegExp(`.{1,${this.groupSize}}`, 'g'))?.join(' ') || digits;
-    }
-
-    parse(formatted: string): Uint8Array {
-        const digits = formatted.replaceAll(' ', '');
-        const normalized = digits.length % 2 === 1 ? digits.slice(0, -1) : digits;
-        return Uint8Array.from(
-            (normalized.match(/.{1,2}/g) || []).map(pair => parseInt(pair, 10))
-        );
-    }
-
-    calculateCipherLength(plaintextLen: number): number {
-        const ctextLenWoMrk = (Math.ceil((10 + plaintextLen * 2) / this.groupSize) * this.groupSize) - 10;
-        return Math.ceil(ctextLenWoMrk / 2);
+    private tweakIndex(position: number): number {
+        if (!Number.isInteger(position) || position < 1)
+            throw new Error("Tweak position must be an integer >= 1");
+        return position - 1;
     }
 }
-
